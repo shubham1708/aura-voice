@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import httpx
 import os
-import tempfile
+import base64
 
 app = FastAPI()
 
@@ -30,7 +30,7 @@ class TTSRequest(BaseModel):
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "service": "AURA Voice"}
+    return {"status": "ok", "service": "AURA Voice", "has_key": bool(ELEVENLABS_API_KEY)}
 
 @app.post("/tts")
 async def text_to_speech(req: TTSRequest):
@@ -58,9 +58,11 @@ async def text_to_speech(req: TTSRequest):
         )
         
         if response.status_code != 200:
-            raise HTTPException(status_code=response.status_code, detail="ElevenLabs error")
+            raise HTTPException(
+                status_code=response.status_code,
+                detail=f"ElevenLabs error {response.status_code}: {response.text}"
+            )
         
-        import base64
         audio_b64 = base64.b64encode(response.content).decode("utf-8")
         return {"audio": audio_b64, "format": "mp3"}
 
@@ -81,7 +83,10 @@ async def speech_to_text(file: UploadFile = File(...)):
         )
         
         if response.status_code != 200:
-            raise HTTPException(status_code=response.status_code, detail="STT error")
+            raise HTTPException(
+                status_code=response.status_code,
+                detail=f"STT error {response.status_code}: {response.text}"
+            )
         
         result = response.json()
         return {"transcript": result.get("text", "")}
